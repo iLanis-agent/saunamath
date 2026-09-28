@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SaunaMath</title>
+<style>
+  body { font-family: Georgia, serif; max-width: 760px; margin: 0 auto; padding: 1em; color: #2a2624; background: #f7f3ef; }
+  h1 { font-size: 1.5em; }
+  .card { background: #fff; border: 1px solid #e5d8cf; border-radius: 10px; padding: 1em 1.2em; margin: 1em 0; }
+  .card h2 { margin-top: 0; font-size: 1.1em; }
+  label { display: inline-block; min-width: 190px; margin: 0.3em 0; }
+  input, select { padding: 0.3em; border: 1px solid #cbb4a7; border-radius: 6px; width: 110px; }
+  .out { background: #f4e9e2; border-left: 4px solid #7a3b2e; padding: 0.6em 0.9em; border-radius: 0 8px 8px 0; margin-top: 0.7em; }
+  .preset { display:inline-block; margin: 0 0.4em 0.4em 0; padding: 0.25em 0.7em; background: #eedfd6; border-radius: 20px; cursor: pointer; font-size: 0.85em; border: 1px solid #cbb4a7; }
+  .note { color: #71635a; font-size: 0.9em; }
+  a { color: #7a3b2e; }
+</style>
+</head>
+<body>
+<h1>&#129494; SaunaMath</h1>
+<p class="note">Constants: 1 kW per 50 cu ft, glass and cold walls count 1.5x their area as extra volume, 24 in of upper bench per person, 7 lb of stones per kW, heater duty cycle about 70%. <a href="index.html">About</a></p>
+
+<div class="card">
+  <h2>1. The room</h2>
+  <div>
+    <span class="preset" data-l="4" data-w="5" data-h="7">Closet 4x5</span>
+    <span class="preset" data-l="5" data-w="6" data-h="7">Classic 5x6</span>
+    <span class="preset" data-l="6" data-w="8" data-h="7">Big 6x8</span>
+  </div>
+  <label for="len">Length (ft):</label><input id="len" type="number" value="5" min="2" step="0.5"><br>
+  <label for="wid">Width (ft):</label><input id="wid" type="number" value="6" min="2" step="0.5"><br>
+  <label for="hgt">Height (ft):</label><input id="hgt" type="number" value="7" min="5" step="0.5"><br>
+  <label for="glass">Glass door/window (sq ft):</label><input id="glass" type="number" value="8" min="0"><br>
+  <label for="cold">Uninsulated surface (sq ft):</label><input id="cold" type="number" value="10" min="0">
+  <div class="out" id="volOut">-</div>
+</div>
+
+<div class="card">
+  <h2>2. Heater and stones</h2>
+  <div class="out" id="kwOut">-</div>
+  <div class="out" id="stoneOut">-</div>
+</div>
+
+<div class="card">
+  <h2>3. Bench</h2>
+  <label for="bench">Upper bench length (in):</label><input id="bench" type="number" value="72" min="0">
+  <div class="out" id="benchOut">-</div>
+</div>
+
+<div class="card">
+  <h2>4. Time and cost</h2>
+  <label for="kwh">Electricity ($/kWh):</label><input id="kwh" type="number" value="0.15" step="0.01" min="0"><br>
+  <label for="hours">Session length (h):</label><input id="hours" type="number" value="1.5" step="0.25" min="0.25">
+  <div class="out" id="heatOut">-</div>
+  <div class="out" id="costOut">-</div>
+</div>
+
+<script src="engine.js"></script>
+<script>
+(function () {
+  function num(id) { return parseFloat(document.getElementById(id).value) || 0; }
+  function fmt(n, d) { return n.toFixed(d === undefined ? 1 : d); }
+
+  function update() {
+    var vol = SaunaMath.volumeCuFt(num('len'), num('wid'), num('hgt'));
+    var eff = SaunaMath.effectiveVolume(vol, num('glass'), num('cold'));
+    document.getElementById('volOut').textContent =
+      fmt(vol, 0) + ' cu ft of room, ' + fmt(eff, 0) + ' cu ft effective after the glass and cold-wall penalty.';
+
+    var kw = SaunaMath.heaterKw(eff);
+    document.getElementById('kwOut').textContent =
+      'Need ' + fmt(kw) + ' kW. ' + SaunaMath.kwVerdict(kw);
+    document.getElementById('stoneOut').textContent =
+      fmt(SaunaMath.stonesLb(kw), 0) + ' lb of olivine or vulcanite stones - rinse them, stack loose, replace the cracked ones yearly.';
+
+    var people = SaunaMath.benchPeople(num('bench'));
+    document.getElementById('benchOut').textContent =
+      people + ' on the upper bench at 24 in each. ' + SaunaMath.benchVerdict(people, kw);
+
+    var mins = SaunaMath.heatupMin(eff, kw);
+    document.getElementById('heatOut').textContent =
+      'About ' + fmt(Math.max(15, mins), 0) + ' minutes to 175F. ' + SaunaMath.heatupVerdict(mins);
+    var cost = SaunaMath.sessionCost(kw, Math.max(0.25, num('hours')), num('kwh'));
+    document.getElementById('costOut').textContent =
+      '$' + cost.toFixed(2) + ' per session. ' + SaunaMath.costVerdict(cost);
+  }
+
+  var presets = document.querySelectorAll('.preset');
+  for (var i = 0; i < presets.length; i++) {
+    presets[i].addEventListener('click', function () {
+      document.getElementById('len').value = this.getAttribute('data-l');
+      document.getElementById('wid').value = this.getAttribute('data-w');
+      document.getElementById('hgt').value = this.getAttribute('data-h');
+      update();
+    });
+  }
+  var inputs = document.querySelectorAll('input, select');
+  for (var j = 0; j < inputs.length; j++) inputs[j].addEventListener('input', update);
+  update();
+})();
+</script>
+</body>
+</html>
